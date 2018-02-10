@@ -1,6 +1,10 @@
 const express = require('express');
 const builder = require('botbuilder');
+const translate = require('google-translate-api');
+
 const intents = require('./intents');
+const lng = require('./lngOptions');
+
 
 // Start server
 const server = express();
@@ -8,6 +12,7 @@ const port = process.env.PORT || 3978;
 server.listen(port, function() {
     console.log("Listening on port: " + port);
 });
+
 
 // Set up the Bot
 
@@ -28,39 +33,36 @@ bot.dialog('/', intents);
 
 bot.dialog('/start', [
     function(session) {
-        session.send("Hi. Type `Begin` to start looking for book prices with your ISBN.");
+        session.send("Hi. You can type anything you want, and I'll translate it back with Google.  \nType `Begin` to start a translation session.");
         session.endDialog();
     }
 ]);
 
-bot.dialog('/isbn', [
+// Choosing a language option
+bot.dialog('/choose', [
     function (session) {
-        session.send("An example input would be `1574321196`")
-        builder.Prompts.text(session, "What is the ISBN value?");
+        session.send("You can cancel anytime by typing `cancel`");
+        builder.Prompts.choice(session, "What language do you want me to speak back?", lng, {listStyle : builder.ListStyle.button});
+        session.send("You can type the language or click an option.");
     },
     function (session, results) {
-        session.userData.input = results.response;
-        builder.Prompts.confirm(session, "Got it. Just to confirm, it's " + session.userData.input + " right?  \nYou can enter `yes` or `no`.");
+        session.userData.choice = lng[results.response.entity]
+        builder.Prompts.confirm(session, "You wanted " + session.userData.choice.name + " right?  \nYou can enter `yes` or `no`.");
     },
     function (session, results) {
         if (results.response) {
-            session.send("Alright! Hang tight.");
-            session.beginDialog('/search')
+            session.send("Okay, I was just checking. Have fun!");
+            session.beginDialog('/translate');
         } else {
-            session.send("Okay. Let's try that again.");
-            session.replaceDialog('/isbn', { reprompt: true })
+            session.replaceDialog('/choose', {reprompt: true});
         }
-        
+    }
+]).endConversationAction("endTranslate", "Sure, translations will be stopped now.",{matches : /^cancel/i});
+
+// Translating based on the option chosen.
+bot.dialog('/translate', [
+    function (session, results) {
+        translate(results.response, {from: 'en', to: session.userData.choice.lang})
+        .then((res) => session.send(res.text))
     }
 ]);
-
-bot.dialog('/search', [
-    function (session) {
-        session.send("You can cancel anytime by typing `cancel`");
-    },
-    function (session) {
-        session.send("Searching Amazon...");
-
-    }
-]).endConversationAction("endSearch", "Sure, the search has now been ended.",{matches : /^cancel/i});
-
