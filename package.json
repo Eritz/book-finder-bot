@@ -1,0 +1,16 @@
+{
+  "name": "book-finder-bot",
+  "version": "1.0.0",
+  "description": "\"Book finder bot\"",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "botbuilder": "^3.14.0",
+    "express": "^4.16.2",
+    "save": "^2.3.2"
+  }
+}
