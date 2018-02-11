@@ -4,7 +4,7 @@ const intents = new builder.IntentDialog();
 
 intents.matches(/^begin/i, [
     function(session) {
-        session.beginDialog('/choose')
+        session.beginDialog('/from')
     }
 ])
 
