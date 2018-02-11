@@ -36,33 +36,71 @@ bot.dialog('/start', [
         session.send("Hi. You can type anything you want, and I'll translate it back with Google.  \nType `Begin` to start a translation session.");
         session.endDialog();
     }
-]);
+])
 
-// Choosing a language option
-bot.dialog('/choose', [
+
+// Language to type in
+bot.dialog('/from', [
     function (session) {
-        session.send("You can cancel anytime by typing `cancel`");
-        builder.Prompts.choice(session, "What language do you want me to speak back?", lng, {listStyle : builder.ListStyle.button});
-        session.send("You can type the language or click an option.");
+        session.send("You can quit anytime by typing `--quit`");
+        builder.Prompts.choice(session, "What language will you be typing in?", lng, {listStyle : builder.ListStyle.button})
+        session.send("You can type or click the language   \nyou'll be typing in.");
     },
     function (session, results) {
-        session.userData.choice = lng[results.response.entity]
-        builder.Prompts.confirm(session, "You wanted " + session.userData.choice.name + " right?  \nYou can enter `yes` or `no`.");
+        session.userData.from_lang = lng[results.response.entity];
+        builder.Prompts.confirm(session,
+             "Just to confirm, you're going  \nto be typing in " + session.userData.from_lang.name + "?  \nYou can enter `yes` or `no`.");
     },
     function (session, results) {
         if (results.response) {
-            session.send("Okay, I was just checking. Have fun!");
-            session.beginDialog('/translate');
+            session.beginDialog('/to');
         } else {
-            session.replaceDialog('/choose', {reprompt: true});
+            session.replaceDialog('/from', {reprompt: true});
         }
     }
-]).endConversationAction("endTranslate", "Sure, translations will be stopped now.",{matches : /^cancel/i});
+])
+.triggerAction({
+    matches: /^--restart/i,
+    onSelectAction: (session, args, next) => {
+        next();
+    }
+})
 
-// Translating based on the option chosen.
+
+// Choosing a language option
+bot.dialog('/to', [
+    function (session) {
+        builder.Prompts.choice(session, "What language do you want me to speak back?", lng, {listStyle : builder.ListStyle.button});
+        session.send("You can type or click the language you  \nwant me to reply back in.");
+    },
+    function (session, results) {
+        session.userData.to_lang = lng[results.response.entity]
+        builder.Prompts.confirm(session, "You wanted " + session.userData.to_lang.name + " right?  \nYou can enter `yes` or `no`.");
+    },
+    function (session, results) {
+        if (results.response) {
+            session.send("Okay, I was just checking.  \nYou can start typing now. Have fun!");
+            session.beginDialog('/translate');
+        } else {
+            session.replaceDialog('/to', {reprompt: true});
+        }
+    }
+])
+.triggerAction({
+    matches: /^--change-to/i,
+})
+
+// Translating based on the options chosen.
 bot.dialog('/translate', [
     function (session, results) {
-        translate(results.response, {from: 'en', to: session.userData.choice.lang})
-        .then((res) => session.send(res.text))
+        if (!session.message.text.match(/^\s*$/)) {
+            session.sendTyping();
+            translate(session.message.text, {from: session.userData.from_lang.lang, to: session.userData.to_lang.lang})
+            .then((res) => session.send(res.text))
+            .catch((err) => session.send("Oh seemed like there was an error. Try again.  \n" + err));
+        }
     }
 ]);
+
+
+bot.endConversationAction("endTranslate", "Sure, translations will be stopped now.",{matches : /^--quit/i});
