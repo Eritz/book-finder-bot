@@ -2,7 +2,6 @@ const express = require('express');
 const builder = require('botbuilder');
 const translate = require('google-translate-api');
 
-const intents = require('./intents');
 const lng = require('./lngOptions');
 
 
@@ -13,8 +12,7 @@ server.listen(port, function() {
     console.log("Listening on port: " + port);
 });
 
-
-// Set up the Bot
+// Bot Configuration
 
 // Create a chat connector for communicating with the Bot Framework Service 
 const connector = new builder.ChatConnector({
@@ -23,21 +21,17 @@ const connector = new builder.ChatConnector({
     appPassword: process.env.APP_PASSWORD
 });
 // Create a bot instance that uses the connector
-const bot = new builder.UniversalBot(connector);
+const bot = new builder.UniversalBot(connector, [
+    function(session) {
+        session.send("Hi there!  \nThis bot will translate messages you entered back to  \na different language.")
+        session.send("Here are the available commands:  \n`--begin` will begin the bot  \n`--restart` will restart  \n`--change-to` will change languages translated   \n`--quit` will quit");
+        session.endDialog();
+    }
+]);
 // Allow the bot to listen for posted messages
 server.post("/api/messages", connector.listen());
 
 // Bot Dialogs and logic
-
-bot.dialog('/', intents);
-
-bot.dialog('/start', [
-    function(session) {
-        session.send("Hi. You can type anything you want, and I'll translate it back with Google.  \nType `Begin` to start a translation session.");
-        session.endDialog();
-    }
-])
-
 
 // Language to type in
 bot.dialog('/from', [
@@ -60,7 +54,7 @@ bot.dialog('/from', [
     }
 ])
 .triggerAction({
-    matches: /^--restart/i,
+    matches: [/^--restart/i, /^--begin/i],
     onSelectAction: (session, args, next) => {
         next();
     }
