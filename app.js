@@ -3,6 +3,7 @@ const builder = require('botbuilder');
 const translate = require('google-translate-api');
 
 const lng = require('./lngOptions');
+const speech = require('./index');
 
 
 // Start server
@@ -23,30 +24,31 @@ const connector = new builder.ChatConnector({
 // Create a bot instance that uses the connector
 const bot = new builder.UniversalBot(connector, [
     function(session) {
-        session.send("Hi there!  \nThis bot will translate messages you entered back to  \na different language.")
-        session.send("Here are the available commands:  \n`--begin` will begin the bot  \n`--restart` will restart  \n`--change-to` will change languages translated   \n`--quit` will quit");
+        session.send(speech.BOT_GREETING)
+        session.send(speech.BOT_COMMANDS);
         session.endDialog();
     }
 ]);
 // Allow the bot to listen for posted messages
 server.post("/api/messages", connector.listen());
 
+/////////////////////////////////////////////////////
 // Bot Dialogs and logic
 
 // Language to type in
 bot.dialog('/from', [
     function (session) {
-        session.send("You can quit anytime by typing `--quit`");
-        builder.Prompts.choice(session, "What language will you be typing in?", lng, {listStyle : builder.ListStyle.button})
-        session.send("You can type or click the language   \nyou'll be typing in.");
+        builder.Prompts.choice(session, speech.BOT_TRANSLATE_FROM, lng, {listStyle : builder.ListStyle.list})
+        session.send(speech.BOT_TYPE_CLICK_FROM);
     },
     function (session, results) {
         session.userData.from_lang = lng[results.response.entity];
         builder.Prompts.confirm(session,
-             "Just to confirm, you're going  \nto be typing in " + session.userData.from_lang.name + "?  \nYou can enter `yes` or `no`.");
+             "Just to confirm, you're going  \nto be typing in " + session.userData.from_lang.name + speech.BOT_YES_OR_NO);
     },
     function (session, results) {
         if (results.response) {
+            session.endDialog();
             session.beginDialog('/to');
         } else {
             session.replaceDialog('/from', {reprompt: true});
@@ -54,7 +56,7 @@ bot.dialog('/from', [
     }
 ])
 .triggerAction({
-    matches: [/^--restart/i, /^--begin/i],
+    matches: [/^\/restart/i, /^\/begin/i],
     onSelectAction: (session, args, next) => {
         next();
     }
@@ -64,16 +66,18 @@ bot.dialog('/from', [
 // Choosing a language option
 bot.dialog('/to', [
     function (session) {
-        builder.Prompts.choice(session, "What language do you want me to speak back?", lng, {listStyle : builder.ListStyle.button});
-        session.send("You can type or click the language you  \nwant me to reply back in.");
+        builder.Prompts.choice(session, speech.BOT_TRANSLATE_TO, lng, {listStyle : builder.ListStyle.list});
+        session.send(speech.BOT_TYPE_CLICK_TO);
     },
     function (session, results) {
         session.userData.to_lang = lng[results.response.entity]
-        builder.Prompts.confirm(session, "You wanted " + session.userData.to_lang.name + " right?  \nYou can enter `yes` or `no`.");
+        builder.Prompts.confirm(session, "You wanted " + session.userData.to_lang.name + speech.BOT_YES_OR_NO);
     },
     function (session, results) {
         if (results.response) {
-            session.send("Okay, I was just checking.  \nYou can start typing now. Have fun!");
+            session.send(speech.BOT_CONFIRM);
+            session.send(speech.BOT_QUIT_REMINDER);
+            session.endDialog();            
             session.beginDialog('/translate');
         } else {
             session.replaceDialog('/to', {reprompt: true});
@@ -81,20 +85,32 @@ bot.dialog('/to', [
     }
 ])
 .triggerAction({
-    matches: /^--change-to/i,
+    matches: /^\/change/i,
 })
 
 // Translating based on the options chosen.
 bot.dialog('/translate', [
     function (session, results) {
-        if (!session.message.text.match(/^\s*$/)) {
-            session.sendTyping();
-            translate(session.message.text, {from: session.userData.from_lang.lang, to: session.userData.to_lang.lang})
-            .then((res) => session.send(res.text))
-            .catch((err) => session.send("Oh seemed like there was an error. Try again.  \n" + err));
-        }
+        translate(session.message.text, {from: session.userData.from_lang.lang, to: session.userData.to_lang.lang})
+        .then((res) => session.sendTyping().send(res.text))
+        .catch((err) => session.send("Oh seemed like there was an error. Try again.  \n" + err));
     }
 ]);
 
+// The help message
+bot.customAction({
+    matches: /\/help/i,
+    onSelectAction: (session, args, next) => {
+        session.send(speech.BOT_COMMANDS);
+    }
+})
 
-bot.endConversationAction("endTranslate", "Sure, translations will be stopped now.",{matches : /^--quit/i});
+// The about message
+bot.customAction({
+    matches: /\/about/i,
+    onSelectAction: (session, args, next) => {
+        session.send(speech.BOT_ABOUT);
+    }
+})
+
+bot.endConversationAction("endTranslate", speech.BOT_QUIT,{matches : /^\/quit/i});
